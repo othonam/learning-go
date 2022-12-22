@@ -12,7 +12,7 @@ import (
 func Start() {
 
 	//wiring
-	ch := CustomerHandler{service.NewCustomerService(domain.NewCustomerRepositoryStub())}
+	ch := CustomerHandler{service.NewCustomerService(domain.NewCustomerRepositoryDb())}
 	//mux := http.NewServeMux()
 	router := mux.NewRouter()
 	//define routes
