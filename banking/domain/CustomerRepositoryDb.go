@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"banking/errs"
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
@@ -12,7 +14,7 @@ type CustomerRepositoryDb struct {
 	client *sql.DB
 }
 
-func (d CustomerRepositoryDb) FindAll() ([]Customer, error) {
+func (d CustomerRepositoryDb) FindAll() ([]Customer, *errs.AppError) {
 
 	findAllSql := "SELECT customer_id, name, city, zipcode, date_of_birth, status FROM CUSTOMERS"
 
@@ -20,7 +22,7 @@ func (d CustomerRepositoryDb) FindAll() ([]Customer, error) {
 
 	if err != nil {
 		log.Println("Error while querying customer table ", err.Error())
-		return nil, err
+		return nil, errs.NewUnexpectedError("Unexpected database error")
 	}
 
 	customers := make([]Customer, 0)
@@ -30,14 +32,38 @@ func (d CustomerRepositoryDb) FindAll() ([]Customer, error) {
 		err := rows.Scan(&c.Id, &c.Name, &c.City, &c.Zipcode, &c.DateofBirth, &c.Status)
 
 		if err != nil {
-			log.Println("Error while scanning customers ", err.Error())
-			return nil, err
+			if err == sql.ErrNoRows {
+				return nil, errs.NewNotFoundError("Customer not found")
+			} else {
+				log.Println("Error while scanning customers ", err.Error())
+				return nil, errs.NewUnexpectedError("Unexpected database error")
+			}
 		}
 
 		customers = append(customers, c)
 	}
 
 	return customers, nil
+}
+
+func (d CustomerRepositoryDb) ById(id string) (*Customer, *errs.AppError) {
+
+	findById := fmt.Sprintf("SELECT customer_id, name, city, zipcode, date_of_birth, status FROM CUSTOMERS WHERE customer_id = ?")
+
+	row := d.client.QueryRow(findById, id)
+	var c Customer
+	err := row.Scan(&c.Id, &c.Name, &c.City, &c.Zipcode, &c.DateofBirth, &c.Status)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errs.NewNotFoundError("Customer not found")
+		} else {
+			log.Println("Error while scanning customers ", err.Error())
+			return nil, errs.NewUnexpectedError("Unexpected database error")
+		}
+	}
+
+	return &c, nil
 }
 
 func NewCustomerRepositoryDb() CustomerRepositoryDb {
