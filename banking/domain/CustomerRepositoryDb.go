@@ -8,51 +8,33 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 )
 
 type CustomerRepositoryDb struct {
-	client *sql.DB
+	client *sqlx.DB
 }
 
 func (d CustomerRepositoryDb) FindAll() ([]Customer, *errs.AppError) {
+	var err error
+	customers := make([]Customer, 0)
 
 	findAllSql := "SELECT customer_id, name, city, zipcode, date_of_birth, status FROM CUSTOMERS"
-
-	rows, err := d.client.Query(findAllSql)
+	err = d.client.Select(&customers, findAllSql)
 
 	if err != nil {
 		logger.Error("Error while querying customer table " + err.Error())
 		return nil, errs.NewUnexpectedError("Unexpected database error")
 	}
 
-	customers := make([]Customer, 0)
-
-	for rows.Next() {
-		var c Customer
-		err := rows.Scan(&c.Id, &c.Name, &c.City, &c.Zipcode, &c.DateofBirth, &c.Status)
-
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return nil, errs.NewNotFoundError("Customer not found")
-			} else {
-				logger.Error("Error while scanning customers " + err.Error())
-				return nil, errs.NewUnexpectedError("Unexpected database error")
-			}
-		}
-
-		customers = append(customers, c)
-	}
-
 	return customers, nil
 }
 
 func (d CustomerRepositoryDb) ById(id string) (*Customer, *errs.AppError) {
-
 	findById := fmt.Sprintf("SELECT customer_id, name, city, zipcode, date_of_birth, status FROM CUSTOMERS WHERE customer_id = ?")
-
-	row := d.client.QueryRow(findById, id)
 	var c Customer
-	err := row.Scan(&c.Id, &c.Name, &c.City, &c.Zipcode, &c.DateofBirth, &c.Status)
+
+	err := d.client.Get(&c, findById, id)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -67,7 +49,7 @@ func (d CustomerRepositoryDb) ById(id string) (*Customer, *errs.AppError) {
 }
 
 func NewCustomerRepositoryDb() CustomerRepositoryDb {
-	client, err := sql.Open("mysql", "root:bloody@tcp(localhost:3306)/banking")
+	client, err := sqlx.Open("mysql", "root:bloody@tcp(localhost:3306)/banking")
 	if err != nil {
 		panic(err)
 	}
